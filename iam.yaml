@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  s3Role:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: custom_s3_policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: VisualEditor0
+                Effect: Allow
+                Action:
+                  - s3:GetObjectAcl
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - arn:aws:s3:::assignment-screenshots
+                  - arn:aws:s3:::*/*
+              - Sid: VisualEditor1
+                Effect: Allow
+                Action:
+                  - s3:ListAllMyBuckets
+                  - s3:HeadBucket
+                Resource: "*"
+      RoleName: s3Role
+  RootInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref s3Role
+Outputs:
+  InstanceRoleArn:
+    Description: The Instance RoleArn for Instance
+    Value: {"Fn::GetAtt" : ["RootInstanceProfile", "Arn"] }
+    Export:
+      Name: s3RoleArn

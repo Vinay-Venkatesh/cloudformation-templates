@@ -1,0 +1,26 @@
+[
+  {
+    "ParameterKey": "EnvironmentName",
+    "ParameterValue": "credit-saison-webapplication"
+  },
+  {
+    "ParameterKey": "launchconfigname",
+    "ParameterValue": "launch-config-nginxserver"
+  },
+  {
+    "ParameterKey": "targetgroupname",
+    "ParameterValue": "tg-nginxserver-8080"
+  },
+  {
+    "ParameterKey": "myKeyPair",
+    "ParameterValue": "virgina"
+  },
+  {
+    "ParameterKey": "ProfileWithRolesForTheApp",
+    "ParameterValue": "s3RoleArn"
+  },
+  {
+      "ParameterKey": "elbArnString",
+      "ParameterValue": "arn:aws:elasticloadbalancing:us-east-1:920055073134:targetgroup/elb-WebAppT-A7LRZVW9VRR3/191b3ac9234eb3f1"
+  }
+]

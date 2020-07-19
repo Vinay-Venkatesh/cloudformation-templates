@@ -1,0 +1,135 @@
+Description:
+  This yml contains resources w.r.t EC2
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+  launchconfigname:
+    Description: ASG Launch Config Name
+    Type: String
+  targetgroupname:
+    Description: Target Group Name of load balancer
+    Type: String
+  myKeyPair:
+    Description: KeyPair for Ec2
+    Type: String
+  ProfileWithRolesForTheApp:
+    Description: Role Name
+    Type: String
+  elbArnString:
+    Description: ARN String
+    Type: String
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-08f3d892de259504d
+    us-east-2:
+      AMI: ami-02ccb28830b645a41
+Resources:
+  #apache-Server Security Group
+  apacheServerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http,ssh ports
+      VpcId:
+        Fn::ImportValue:
+          Fn::Sub: "${EnvironmentName}-VPCID"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 10.0.0.0/20
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId:
+            Fn::ImportValue: "LB-sgId"
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+      GroupName: "Sg-apache"
+
+  #AutoScaling group Launch Configuration
+  apacheLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Metadata:
+      Comment: Install puppet and git
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            rpm:
+              epel: "https://yum.puppetlabs.com/puppetlabs-release-pc1-el-5.noarch.rpm"
+            yum:
+              puppet-agent: []
+              git: []
+          commands:
+            1_pvcreate:
+              command: pvcreate /dev/nvme1n1
+            2_vgcreate:
+              command: vgcreate partition1 /dev/nvme1n1
+            3_lvcreate:
+              command: lvcreate -l 100%FREE -n webpage partition1
+            4_mkfs:
+              command: mkfs.ext4 /dev/partition1/webpage
+            5_mkdir:
+              command: mkdir /webpage
+            6_fstab:
+              command: echo "/dev/mapper/partition1-webpage /webpage ext4 defaults 0 2" >> /etc/fstab
+            7_mount:
+              command: mount -a
+    Properties:
+      ImageId:
+        Fn::FindInMap:
+          - RegionMap
+          - !Ref AWS::Region
+          - AMI
+      IamInstanceProfile:
+        Fn::ImportValue: !Ref ProfileWithRolesForTheApp
+      UserData:
+        Fn::Base64:
+          !Sub |
+          #!/bin/bash -xe
+          # Ensure AWS CFN Bootstrap is the latest
+          yum install -y aws-cfn-bootstrap
+          # Install the files and packages from the metadata
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource apacheLaunchConfig --region ${AWS::Region}
+          #Run puppet
+          curl -s -L https://raw.githubusercontent.com/xxCoDeBoX/puppet-bootstrap-script/master/apache-config.sh | bash
+      SecurityGroups:
+        - Ref: apacheServerSG
+      KeyName: !Ref myKeyPair
+      InstanceType: t3.micro
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sdb"
+          Ebs:
+            VolumeSize: '1'
+            DeleteOnTermination: "true"
+            Encrypted: "true"
+      #LaunchConfigurationName:
+      #  Fn::Sub: "${launchconfigname}"
+
+  #AutoScaling group configuration
+  apacheAutoScaling:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+        Fn::Split:
+          - ","
+          - Fn::ImportValue:
+              Fn::Sub: "${EnvironmentName}-PRI1-SN"
+      LaunchConfigurationName:
+        Ref: "apacheLaunchConfig"
+      MinSize: "1"
+      MaxSize: "1"
+      TargetGroupARNs:
+        Fn::Split:
+          - ","
+          - Fn::Sub: "${elbArnString}"
+      Tags:
+        - Key: Name
+          Value: credit-sasion-apache-application
+          PropagateAtLaunch: True
