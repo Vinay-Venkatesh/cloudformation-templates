@@ -1,0 +1,26 @@
+[
+  {
+    "ParameterKey": "EnvironmentName",
+    "ParameterValue": "credit-saison-webapplication"
+  },
+  {
+    "ParameterKey": "LBType",
+    "ParameterValue": "application"
+  },
+  {
+    "ParameterKey": "LBSchema",
+    "ParameterValue": "internet-facing"
+  },
+  {
+    "ParameterKey": "LBName",
+    "ParameterValue": "webapplication-LB"
+  },
+  {
+    "ParameterKey": "ipaddrType",
+    "ParameterValue": "ipv4"
+  },
+  {
+    "ParameterKey": "TargetType",
+    "ParameterValue": "instance"
+  }
+]

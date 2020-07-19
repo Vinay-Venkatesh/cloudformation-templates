@@ -1,0 +1,114 @@
+Description:
+  This yml contains resources w.r.t ELB
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+  LBType:
+    Description: Application | Network
+    Type: String
+  LBSchema:
+    Description: internal | internet-facing
+    Type: String
+  LBName:
+    Description: Name of the Load Balancer
+    Type: String
+  ipaddrType:
+    Description: IpAddr Type ipv4 | ipv6
+    Type: String
+  TargetType:
+    Description: Target Type - Instance | Ip
+    Type: String
+
+Resources:
+  LoadBalancerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http to client host
+      VpcId:
+        Fn::ImportValue:
+          Fn::Sub: "${EnvironmentName}-VPCID"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      GroupName: "loadbalancer-webapplication-sg"
+
+  #Load Balancer Target Group
+  WebAppTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      TargetType:
+        Fn::Sub: "${TargetType}"
+      Protocol:
+        Fn::Sub: "${protocol}"
+      VpcId:
+        Fn::ImportValue:
+          Fn::Sub: "${EnvironmentName}-VPCID"
+      #Advanced Settings
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 8
+      HealthyThresholdCount: 2
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 5
+      #Name:
+      #  Fn::Sub: "${targetgroupname}"
+
+  #Load Balancer
+  WebAppLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType:
+        Fn::Sub: "${ipaddrType}"
+      Name:
+        Fn::Sub: "${LBName}"
+      Scheme:
+        Fn::Sub: "${LBSchema}"
+      SecurityGroups:  # or !Ref: LoadBalancerSG
+        - Ref: LoadBalancerSG
+      Subnets:
+        - Fn::ImportValue:
+            Fn::Sub: "${EnvironmentName}-PUB1-SN"
+        - Fn::ImportValue:
+            Fn::Sub: "${EnvironmentName}-PUB2-SN"
+      Tags:
+        - Key: Name
+          Value: WebAppLoadBalacner
+      Type:
+        Fn::Sub: "${LBType}"
+
+  #ALB Listener
+  ALBListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            Ref: WebAppTargetGroup
+      LoadBalancerArn:
+        Ref: WebAppLB
+      Port: '80'
+      Protocol: HTTP
+
+Outputs:
+  TargetGroupName:
+    Description: Target group FullName
+    Value: {"Fn::GetAtt" : ["WebAppTargetGroup", "TargetGroupFullName"] }
+    Export:
+      Name: webapp-targetgroup
+
+  SecurityGroupId:
+    Description: Load Balancer security group Id
+    Value: {"Fn::GetAtt": ["LoadBalancerSG", "GroupId"] }
+    Export:
+      Name: LB-sgId
